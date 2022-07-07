@@ -4,6 +4,7 @@
 #define QPC_H
 
 #include "windows.h"
+#include "stdio.h"
 
 // Basic usage:
 //   QPC_StartCounter();
@@ -24,68 +25,80 @@ void QPC_EndCounterPrint(char *Message); // Prints Your message followed by the 
 
 // ------------------------------------------------------------------------------------------------
 
-struct qpc_counter
-{
-    LARGE_INTEGER StartingTime;
-    LARGE_INTEGER Frequency;
+//
+// TIMED_BLOCK
+//
+// Timing a block of code using c++ constructor/desctuctor
+#ifdef __cplusplus
+struct High_Resolution_Timer {
+    char *function;
+    LARGE_INTEGER starting_time;
+    LARGE_INTEGER frequency;
 };
 
-qpc_counter QPC_CounterQueue[MAX_COUNTER_CALLS] = {};
-int QPC_CounterCount = 0;
+#endif
 
-void QPC_AddCounter(qpc_counter Counter)
+struct QPC_Counter
 {
-    if(QPC_CounterCount < MAX_COUNTER_CALLS)
+    LARGE_INTEGER starting_time;
+    LARGE_INTEGER frequency;
+};
+
+static QPC_Counter global_qpc_counter_queue[MAX_COUNTER_CALLS] = {};
+static int global_qpc_counter_count = 0;
+
+void QPC_AddCounter(QPC_Counter counter) {
+    if(global_qpc_counter_count < MAX_COUNTER_CALLS)
     {
-        QPC_CounterQueue[QPC_CounterCount] = Counter;
-        QPC_CounterCount++;
+        global_qpc_counter_queue[global_qpc_counter_count] = counter;
+        global_qpc_counter_count++;
     }
 }
 
 void QPC_StartCounter(void)
 {
-    qpc_counter NewCounter = {};
-    QueryPerformanceFrequency(&NewCounter.Frequency);
-    QueryPerformanceCounter(&NewCounter.StartingTime);
-    QPC_AddCounter(NewCounter);
+    QPC_Counter new_counter = {};
+    QueryPerformanceFrequency(&new_counter.frequency);
+    QueryPerformanceCounter(&new_counter.starting_time);
+    QPC_AddCounter(new_counter);
 }
 
 long long QPC_EndCounter()
 {
-    long long Result = 0;
+    long long result = 0;
     
-    if(QPC_CounterCount)
+    if(global_qpc_counter_count)
     {
-        LARGE_INTEGER EndingTime;
-        QueryPerformanceCounter(&EndingTime);
+        LARGE_INTEGER ending_time;
+        QueryPerformanceCounter(&ending_time);
         
-        qpc_counter Counter = QPC_CounterQueue[QPC_CounterCount - 1];
-        QPC_CounterQueue[QPC_CounterCount - 1] = {};
-        QPC_CounterCount--;
+        QPC_Counter counter = global_qpc_counter_queue[global_qpc_counter_count - 1];
+        global_qpc_counter_queue[global_qpc_counter_count - 1] = {};
+        global_qpc_counter_count--;
         
-        LARGE_INTEGER ElapsedMicroseconds = {};
-        ElapsedMicroseconds.QuadPart = EndingTime.QuadPart - Counter.StartingTime.QuadPart;
-        Result = (ElapsedMicroseconds.QuadPart * 1000000) / Counter.Frequency.QuadPart;
+        LARGE_INTEGER elapsed_microseconds = {};
+        elapsed_microseconds.QuadPart = ending_time.QuadPart - counter.starting_time.QuadPart;
+        result = (elapsed_microseconds.QuadPart * 1000000) / counter.frequency.QuadPart;
     }
     
-    return Result;
+    return result;
 }
 
-void QPC_EndCounterPrint(char *Message)
+void QPC_EndCounterPrint(char *message)
 {
-    if(QPC_CounterCount)
+    if(global_qpc_counter_count)
     {
-        LARGE_INTEGER EndingTime;
-        QueryPerformanceCounter(&EndingTime);
+        LARGE_INTEGER ending_time;
+        QueryPerformanceCounter(&ending_time);
         
-        qpc_counter Counter = QPC_CounterQueue[QPC_CounterCount - 1];
-        QPC_CounterQueue[QPC_CounterCount - 1] = {};
-        QPC_CounterCount--;
+        QPC_Counter counter = global_qpc_counter_queue[global_qpc_counter_count - 1];
+        global_qpc_counter_queue[global_qpc_counter_count - 1] = {};
+        global_qpc_counter_count--;
         
-        LARGE_INTEGER ElapsedMicroseconds = {};
-        ElapsedMicroseconds.QuadPart = EndingTime.QuadPart - Counter.StartingTime.QuadPart;
-        long long Result = (ElapsedMicroseconds.QuadPart * 1000000) / Counter.Frequency.QuadPart;
-        printf("%s %Lf ms\n", Message, Result / 1000.0l);
+        LARGE_INTEGER elapsed_microseconds = {};
+        elapsed_microseconds.QuadPart = ending_time.QuadPart - counter.starting_time.QuadPart;
+        long long result = (elapsed_microseconds.QuadPart * 1000000) / counter.frequency.QuadPart;
+        printf("%s %Lf ms\n", message, result / 1000.0l);
     }
     else
     {
